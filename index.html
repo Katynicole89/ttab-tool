@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTAB → Google Docs Intake</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Code+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f1117;
+    --surface:#181c26;
+    --surface2:#1e2330;
+    --border:#2a3042;
+    --orange:#f26522;
+    --orange-light:#ff8c4b;
+    --orange-dim:rgba(242,101,34,0.15);
+    --success:#22c55e;
+    --success-bg:rgba(34,197,94,0.08);
+    --success-border:rgba(34,197,94,0.3);
+    --error:#f87171;
+    --error-bg:rgba(248,113,113,0.08);
+    --error-border:rgba(248,113,113,0.3);
+    --running-bg:rgba(99,152,247,0.08);
+    --running-border:rgba(99,152,247,0.3);
+    --running-color:#93b4f7;
+    --text:#e8eaf0;
+    --muted:#5a6075;
+    --serif:'Playfair Display','Georgia',serif;
+    --mono:'Source Code Pro','Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--serif);min-height:100vh;padding:48px 20px 80px;}
+  .header{max-width:740px;margin:0 auto 44px;text-align:center;}
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
+  h1{font-size:38px;font-weight:700;letter-spacing:-.5px;line-height:1.1;margin-bottom:10px;color:var(--text);}
+  h1 span{color:var(--orange);}
+  .sub{font-family:var(--mono);font-size:12px;color:var(--muted);}
+  .container{max-width:740px;margin:0 auto;display:flex;flex-direction:column;gap:16px;}
+  .card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:28px;transition:border-color .2s;}
+  .card.active{border-color:rgba(242,101,34,0.5);box-shadow:0 0 0 3px rgba(242,101,34,0.06);}
+  .card.dimmed{opacity:.4;pointer-events:none;}
+  .card-lbl{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+  .row{display:flex;gap:10px;}
+  input[type=url],input[type=text]{
+    flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;
+    padding:11px 14px;font-family:var(--mono);font-size:13px;color:var(--text);outline:none;transition:border-color .2s;
+  }
+  input:focus{border-color:var(--orange);}
+  input::placeholder{color:var(--muted);}
+  .btn{font-family:var(--serif);font-weight:600;font-size:14px;padding:11px 24px;border-radius:6px;border:none;cursor:pointer;transition:all .2s;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;}
+  .btn-orange{background:var(--orange);color:#fff;}
+  .btn-orange:hover{background:var(--orange-light);transform:translateY(-1px);box-shadow:0 4px 16px rgba(242,101,34,0.35);}
+  .btn-orange:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+  .btn-out{background:transparent;color:var(--orange);border:1.5px solid rgba(242,101,34,0.4);}
+  .btn-out:hover{background:var(--orange-dim);}
+  .btn-goog{background:var(--surface2);color:var(--text);border:1.5px solid var(--border);font-family:var(--mono);font-size:13px;padding:11px 20px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:10px;transition:all .2s;}
+  .btn-goog:hover{border-color:var(--orange);box-shadow:0 2px 12px rgba(242,101,34,0.15);}
+  .status{border-radius:7px;padding:10px 15px;font-family:var(--mono);font-size:12px;display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .status.idle{display:none;}
+  .status.running{background:var(--running-bg);border:1px solid var(--running-border);color:var(--running-color);}
+  .status.success{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);}
+  .status.error{background:var(--error-bg);border:1px solid var(--error-border);color:var(--error);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px 32px;margin-bottom:26px;}
+  @media(max-width:560px){.fgrid{grid-template-columns:1fr;}}
+  .fi{border-bottom:1px solid var(--border);padding-bottom:10px;}
+  .fi.miss{border-bottom-color:rgba(245,158,11,0.5);}
+  .flbl{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:5px;}
+  .fi.miss .flbl{color:#f59e0b;}
+  .fedit{width:100%;background:transparent;border:none;font-family:var(--mono);font-size:13px;color:var(--text);outline:none;padding:0;border-bottom:1px solid transparent;transition:border-color .15s;}
+  .fedit:focus{border-bottom-color:var(--orange);}
+  .fedit.empty{color:#f59e0b;font-style:italic;}
+  .steps{display:flex;align-items:center;margin-bottom:8px;}
+  .snode{display:flex;align-items:center;gap:7px;}
+  .sdot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;flex-shrink:0;}
+  .sdot.active{background:var(--orange);color:#fff;}
+  .sdot.done{background:rgba(34,197,94,0.15);color:var(--success);border:1.5px solid rgba(34,197,94,0.4);}
+  .sdot.inactive{background:var(--surface2);color:var(--muted);}
+  .sname{font-family:var(--mono);font-size:11px;white-space:nowrap;}
+  .sname.active{color:var(--orange);}
+  .sname.done{color:var(--success);}
+  .sname.inactive{color:var(--muted);}
+  .sline{flex:1;height:1px;background:var(--border);margin:0 10px;}
+  .auth-user{font-family:var(--mono);font-size:12px;color:var(--success);display:none;align-items:center;gap:8px;margin-top:12px;}
+  .done-card{background:var(--success-bg);border:1.5px solid var(--success-border);border-radius:10px;padding:36px;text-align:center;display:none;}
+  .done-card.visible{display:block;}
+  .done-card h2{font-size:24px;color:var(--success);margin-bottom:8px;}
+  .done-card p{font-family:var(--mono);font-size:12px;color:#4ade80;margin-bottom:24px;opacity:.8;}
+  .brow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+  .note{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:14px;}
+  /* Accent line under header */
+  .header-line{width:48px;height:3px;background:var(--orange);border-radius:2px;margin:14px auto 0;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="eyebrow">USPTO · TTABVUE · Automated Motion to Withdrawal</div>
+  <h1>TTAB <span>→</span> Google Docs</h1>
+  <p class="sub">Paste a TTABvue opposition URL and auto-fill your intake template</p>
+  <div class="header-line"></div>
+</div>
+
+<div class="container">
+
+  <div class="steps">
+    <div class="snode"><div class="sdot active" id="d1">1</div><span class="sname active" id="n1">Sign In</span></div>
+    <div class="sline"></div>
+    <div class="snode"><div class="sdot inactive" id="d2">2</div><span class="sname inactive" id="n2">TTAB URL</span></div>
+    <div class="sline"></div>
+    <div class="snode"><div class="sdot inactive" id="d3">3</div><span class="sname inactive" id="n3">Review</span></div>
+    <div class="sline"></div>
+    <div class="snode"><div class="sdot inactive" id="d4">4</div><span class="sname inactive" id="n4">Done</span></div>
+  </div>
+
+  <!-- Step 1: Auth -->
+  <div class="card active" id="card-auth">
+    <div class="card-lbl">Step 1 — Google Sign In</div>
+    <p class="note">Sign in with your Google account so this tool can create documents in your Drive.</p>
+    <button class="btn-goog" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="auth-user" id="auth-user"></div>
+  </div>
+
+  <!-- Step 2: URL -->
+  <div class="card dimmed" id="card-url">
+    <div class="card-lbl">Step 2 — TTABvue Case URL</div>
+    <div class="row">
+      <input type="url" id="ttab-url" placeholder="https://ttabvue.uspto.gov/ttabvue/v?pno=91292379" />
+      <button class="btn btn-orange" id="extract-btn" onclick="extractData()">Extract Data →</button>
+    </div>
+    <div class="status idle" id="fetch-status"></div>
+    <div id="manual-toggle" style="display:none;margin-top:12px;">
+      <button class="btn btn-out" onclick="showManual()">Enter Fields Manually Instead</button>
+    </div>
+  </div>
+
+  <!-- Manual fallback -->
+  <div class="card dimmed" id="card-manual" style="display:none">
+    <div class="card-lbl">Manual Entry</div>
+    <p class="note">The TTAB page could not be fetched. Fill in the fields below and click Continue.</p>
+    <div class="fgrid" id="manual-grid"></div>
+    <button class="btn btn-orange" onclick="useManualData()">Continue →</button>
+  </div>
+
+  <!-- Step 3: Review -->
+  <div class="card dimmed" id="card-review">
+    <div class="card-lbl">Step 3 — Review & Edit Fields <span style="font-size:10px;color:var(--muted);margin-left:6px;">(click any field to edit)</span></div>
+    <div class="fgrid" id="fields-grid"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <button class="btn btn-orange" id="create-btn" onclick="createDoc()">Create Google Doc →</button>
+      <button class="btn btn-out" onclick="resetTool()">Start Over</button>
+    </div>
+    <div class="status idle" id="create-status"></div>
+  </div>
+
+  <!-- Done -->
+  <div class="done-card" id="card-done">
+    <div style="font-size:44px;margin-bottom:14px;">✓</div>
+    <h2>Document Created</h2>
+    <p>All fields have been filled in your Google Doc copy.</p>
+    <div class="brow">
+      <a id="doc-link" href="#" target="_blank"><button class="btn btn-orange">Open Document →</button></a>
+      <button class="btn btn-out" onclick="resetTool()">Process Another</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CLIENT_ID       = '154816627424-kaqi5a3mf5sq16oiv0jbq5t55oq4ni7i.apps.googleusercontent.com';
+const HOSTED_URL      = 'https://woa-ttab.netlify.app';
+const TEMPLATE_DOC_ID = '1R5H9dDR5xaAW-cZYksAmrCJnNWqit8WGpOOii4GH0UE';
+const SCOPES          = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive';
+
+const PLACEHOLDER_MAP = {
+  oppositionNumber:'{{OPPOSITION_NUMBER}}', clientName:'{{CLIENT_NAME}}',
+  clientEmail:'{{CLIENT_EMAIL}}',           clientAddress:'{{CLIENT_ADDRESS}}',
+  attorneyName:'{{ATTORNEY_NAME}}',         attorneyPhone:'{{ATTORNEY_PHONE}}',
+  serialNumber:'{{SERIAL_NUMBER}}',         mark:'{{MARK}}',
+  opposer:'{{OPPOSER}}',                    opposingCounselName:'{{OPPOSING_COUNSEL_NAME}}',
+  opposingCounselEmails:'{{OPPOSING_COUNSEL_EMAILS}}',
+};
+const FIELD_LABELS = {
+  oppositionNumber:'Opposition Number', clientName:'Client Name',
+  clientEmail:'Client Email',           clientAddress:'Client Address',
+  attorneyName:'Attorney Name',         attorneyPhone:'Attorney Phone',
+  serialNumber:'Serial Number',         mark:'Mark',
+  opposer:'Opposer',                    opposingCounselName:'Opposing Counsel Name',
+  opposingCounselEmails:'Opposing Counsel Emails',
+};
+
+let accessToken = null;
+let extractedData = {};
+
+function signIn() {
+  const p = new URLSearchParams({client_id:CLIENT_ID,redirect_uri:HOSTED_URL,response_type:'token',scope:SCOPES,prompt:'select_account'});
+  window.location.href = 'https://accounts.google.com/o/oauth2/auth?' + p.toString();
+}
+function checkAuth() {
+  const hash = window.location.hash;
+  if (!hash.includes('access_token')) return;
+  const p = new URLSearchParams(hash.substring(1));
+  accessToken = p.get('access_token');
+  history.replaceState(null,'',window.location.pathname);
+  onSignedIn();
+}
+async function onSignedIn() {
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{'Authorization':'Bearer '+accessToken}});
+    const u = await r.json();
+    const el = document.getElementById('auth-user');
+    el.innerHTML = '✓ Signed in as ' + (u.email||'your Google account');
+    el.style.display = 'flex';
+  } catch(e) {
+    const el = document.getElementById('auth-user');
+    el.innerHTML = '✓ Signed in';
+    el.style.display = 'flex';
+  }
+  setStep(2);
+}
+
+async function fetchPage(url) {
+  const proxies = [
+    async u => { const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`); const j=await r.json(); if(!j.contents||j.contents.length<200) throw new Error('empty'); return j.contents; },
+    async u => { const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(u)}`); if(!r.ok) throw new Error('fail'); return r.text(); },
+    async u => { const r=await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`); if(!r.ok) throw new Error('fail'); return r.text(); },
+  ];
+  for (let i=0;i<proxies.length;i++) {
+    try { return await proxies[i](url); } catch(e) { if(i===proxies.length-1) throw new Error('All proxies failed.'); }
+  }
+}
+
+async function extractData() {
+  const url = document.getElementById('ttab-url').value.trim();
+  if (!url) { showStatus('fetch-status','error','Please enter a TTABvue URL.'); return; }
+  const btn = document.getElementById('extract-btn');
+  btn.disabled = true;
+  document.getElementById('manual-toggle').style.display = 'none';
+  showStatus('fetch-status','running','Fetching TTAB page...');
+  try {
+    const html = await fetchPage(url);
+    const doc  = new DOMParser().parseFromString(html,'text/html');
+    const txt  = doc.body.innerText.replace(/\s+/g,' ').trim().substring(0,6000);
+    if (txt.length < 100) throw new Error('Page returned no usable content.');
+    showStatus('fetch-status','running','Extracting fields with AI...');
+    const resp = await fetch('/.netlify/functions/extract',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pageText:txt}),
+    });
+    if (!resp.ok) { const e=await resp.json(); throw new Error(e.error||'Extraction failed'); }
+    extractedData = await resp.json();
+    renderFields('fields-grid',true);
+    setStep(3);
+    showStatus('fetch-status','success','✓ Fields extracted for Opposition #'+(extractedData.oppositionNumber||'—'));
+  } catch(err) {
+    showStatus('fetch-status','error','Error: '+err.message);
+    document.getElementById('manual-toggle').style.display = 'block';
+    showManual();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showManual() {
+  const card = document.getElementById('card-manual');
+  card.style.display = 'block';
+  card.className = 'card active';
+  renderFields('manual-grid',false);
+}
+function useManualData() {
+  for (const key of Object.keys(FIELD_LABELS)) {
+    const el = document.getElementById('m-'+key);
+    if (el) extractedData[key] = el.value||'Not found';
+  }
+  renderFields('fields-grid',true);
+  document.getElementById('card-manual').style.display = 'none';
+  setStep(3);
+}
+
+function renderFields(gridId, useExtracted) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  const prefix = useExtracted ? 'f-' : 'm-';
+  for (const [key,label] of Object.entries(FIELD_LABELS)) {
+    const val     = useExtracted ? (extractedData[key]||'') : '';
+    const missing = !val||val==='Not found';
+    const d = document.createElement('div');
+    d.className = 'fi'+(missing?' miss':'');
+    d.innerHTML = `<div class="flbl">${label}${missing?' ⚠':''}</div>
+      <input class="fedit${missing?' empty':''}" id="${prefix}${key}"
+        value="${esc(val)}" placeholder="Enter manually"
+        oninput="if('${prefix}'==='f-')extractedData['${key}']=this.value;this.classList.remove('empty');" />`;
+    grid.appendChild(d);
+  }
+}
+
+async function createDoc() {
+  for (const key of Object.keys(FIELD_LABELS)) {
+    const el = document.getElementById('f-'+key);
+    if (el) extractedData[key] = el.value;
+  }
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true;
+  showStatus('create-status','running','Copying template...');
+  try {
+    const cr = await fetch(`https://www.googleapis.com/drive/v3/files/${TEMPLATE_DOC_ID}/copy`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({name:'TTAB Intake — Opposition '+(extractedData.oppositionNumber||'New')})
+    });
+    if (!cr.ok) { const e=await cr.json(); throw new Error(e.error?.message||'Failed to copy template'); }
+    const {id:newDocId} = await cr.json();
+    showStatus('create-status','running','Filling placeholders...');
+    const requests = Object.entries(PLACEHOLDER_MAP).map(([k,ph])=>({
+      replaceAllText:{containsText:{text:ph,matchCase:true},replaceText:extractedData[k]||''}
+    }));
+    const ur = await fetch(`https://docs.googleapis.com/v1/documents/${newDocId}:batchUpdate`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({requests})
+    });
+    if (!ur.ok) { const e=await ur.json(); throw new Error(e.error?.message||'Failed to fill document'); }
+    document.getElementById('doc-link').href = `https://docs.google.com/document/d/${newDocId}/edit`;
+    setStep(4);
+  } catch(err) {
+    showStatus('create-status','error','Error: '+err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showStatus(id,type,msg) {
+  const el = document.getElementById(id);
+  el.className = 'status '+type;
+  el.innerHTML = (type==='running'?'<div class="spinner"></div>':'')+`<span>${msg}</span>`;
+}
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function setStep(n) {
+  for (let i=1;i<=4;i++) {
+    const state = i<n?'done':i===n?'active':'inactive';
+    document.getElementById('d'+i).className='sdot '+state;
+    document.getElementById('n'+i).className='sname '+state;
+    document.getElementById('d'+i).textContent=state==='done'?'✓':i;
+  }
+  const map={1:'card-auth',2:'card-url',3:'card-review'};
+  for (const [s,id] of Object.entries(map)) {
+    document.getElementById(id).className='card'+(n==s?' active':n>s?'':' dimmed');
+  }
+  if (n===4) document.getElementById('card-done').classList.add('visible');
+}
+function resetTool() {
+  extractedData={};
+  document.getElementById('ttab-url').value='';
+  document.getElementById('fields-grid').innerHTML='';
+  document.getElementById('card-done').classList.remove('visible');
+  document.getElementById('card-manual').style.display='none';
+  document.getElementById('manual-toggle').style.display='none';
+  showStatus('fetch-status','idle','');
+  showStatus('create-status','idle','');
+  document.getElementById('extract-btn').disabled=false;
+  document.getElementById('create-btn').disabled=false;
+  if(accessToken) setStep(2); else setStep(1);
+}
+checkAuth();
+</script>
+</body>
+</html>
